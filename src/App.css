@@ -1,0 +1,6 @@
+/* App-level overrides — component-specific tweaks live in index.css */
+
+/* Ensure popup doesn't bleed outside map */
+.map-container {
+  overflow: hidden;
+}
