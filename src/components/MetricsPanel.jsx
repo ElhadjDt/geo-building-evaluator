@@ -28,12 +28,12 @@ function MetricsPanel({ matchedBuildings }) {
       </div>
 
       <div className="metric-item">
-        <span>Missing (FN)</span>
+        <span>Unmatched Ground Truth</span>
         <span className="metric-value" style={{ color: '#2196f3' }}>{unmatchedGroundTruthCount}</span>
       </div>
 
       <div className="metric-item">
-        <span>Extra (FP)</span>
+        <span>Unmatched Predicted</span>
         <span className="metric-value" style={{ color: '#f44336' }}>{unmatchedPredictedCount}</span>
       </div>
 

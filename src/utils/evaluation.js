@@ -176,15 +176,15 @@ export function getBuildingStyle(source, landuse) {
 
 /**
  * Get style for evaluation mode
- * @param {string} status - 'correct' | 'wrong-type' | 'extra' | 'missing'
+ * @param {string} status - 'correct' | 'wrong-type' | 'unmatchedPred' | 'unmatchedGT'
  * @returns {Object} Leaflet style object
  */
 export function getEvaluationStyle(status) {
   const colorMap = {
     'correct': '#4caf50',
     'wrong-type': '#ff9800',
-    'extra': '#f44336',
-    'missing': '#2196f3'
+    'unmatchedPred': '#f44336',
+    'unmatchedGT': '#2196f3'
   }
 
   return {
@@ -247,10 +247,10 @@ export function calculateBuildingMatches(groundTruth, predicted) {
   const predictedMatches = new Map()
 
   for (const c of gtCentroids) {
-    groundTruthMatches.set(c.feature, { status: 'unmatched', distance: Infinity, matchedFeature: null })
+    groundTruthMatches.set(c.feature, { status: 'unmatchedGT', distance: Infinity, matchedFeature: null })
   }
   for (const c of predCentroids) {
-    predictedMatches.set(c.feature, { status: 'unmatched', distance: Infinity, matchedFeature: null })
+    predictedMatches.set(c.feature, { status: 'unmatchedPred', distance: Infinity, matchedFeature: null })
   }
 
   // Edge case: nothing to match
@@ -349,11 +349,11 @@ function buildResult(groundTruthMatches, predictedMatches, gtTotal, predTotal) {
   for (const match of groundTruthMatches.values()) {
     if (match.status === 'correct') correctCount++
     else if (match.status === 'wrong-type') wrongTypeCount++
-    else unmatchedGroundTruthCount++
+    else if (match.status === 'unmatchedGT') unmatchedGroundTruthCount++
   }
 
   for (const match of predictedMatches.values()) {
-    if (match.status === 'unmatched') unmatchedPredictedCount++
+    if (match.status === 'unmatchedPred') unmatchedPredictedCount++
   }
 
   const totalCount = correctCount + wrongTypeCount

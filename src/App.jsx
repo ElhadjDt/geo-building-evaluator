@@ -230,8 +230,7 @@ function App() {
               style={(feature) => {
                 if (mode === 'evaluation' && matchedBuildings) {
                   const match = matchedBuildings.groundTruthMatches.get(feature)
-                  if (match?.status === 'unmatched') return getEvaluationStyle('missing')
-                  return getEvaluationStyle(match?.status || 'missing')
+                  return getEvaluationStyle(match?.status || 'unmatchedGT')
                 }
                 return getBuildingStyle('groundTruth', feature.properties?.landuse)
               }}
@@ -263,9 +262,7 @@ function App() {
               style={(feature) => {
                 if (mode === 'evaluation' && matchedBuildings) {
                   const match = matchedBuildings.predictedMatches.get(feature)
-                  if (match?.status === 'unmatched') return getEvaluationStyle('extra')
-                  if (match?.status === 'wrong-type') return getEvaluationStyle('wrong-type')
-                  return getEvaluationStyle('correct')
+                  return getEvaluationStyle(match?.status || 'unmatchedPred')
                 }
                 return getBuildingStyle('predicted', feature.properties?.landuse)
               }}

@@ -183,31 +183,33 @@ For each matched pair, compare `feature.properties.landuse`:
 - Same type → `correct`
 - Different type → `wrong-type`
 
-Unmatched GT features → `missing` (false negatives).  
-Unmatched predicted features → `extra` (false positives).
+Unmatched GT features → `unmatchedGT` (geometry has no match in predicted).  
+Unmatched predicted features → `unmatchedPred` (geometry has no match in GT).
 
 **Metrics returned:**
 
 ```
 correctCount               — matched, same type
 wrongTypeCount             — matched, different type
-unmatchedGroundTruthCount  — GT buildings with no predicted match
-unmatchedPredictedCount    — predicted buildings with no GT match
-totalCount                 — correctCount + wrongTypeCount
-accuracy                   — correctCount / totalCount × 100
+unmatchedGroundTruthCount  — GT buildings with no geometric match in predicted
+unmatchedPredictedCount    — predicted buildings with no geometric match in GT
+totalCount                 — correctCount + wrongTypeCount (matched buildings only)
+accuracy                   — correctCount / totalCount × 100 (type accuracy for matched buildings only)
 ```
+
+**Important:** `accuracy` measures **type classification accuracy only for buildings that matched geometrically**. Unmatched buildings indicate geometry mismatches between data sources, not classification errors.
 
 ### Style functions
 
 `getBuildingStyle(source, landuse)` — returns Leaflet style for visualization mode.  
 `getEvaluationStyle(status)` — returns Leaflet style based on match status:
 
-| Status | Color |
-|---|---|
-| `correct` | Green `#4caf50` |
-| `wrong-type` | Orange `#ff9800` |
-| `extra` | Red `#f44336` |
-| `missing` | Blue `#2196f3` |
+| Status | Color | Meaning |
+|---|---|---|
+| `correct` | Green `#4caf50` | Matched geometry, same type |
+| `wrong-type` | Orange `#ff9800` | Matched geometry, different type |
+| `unmatchedPred` | Red `#f44336` | Predicted building with no GT geometry match |
+| `unmatchedGT` | Blue `#2196f3` | GT building with no predicted geometry match |
 
 ---
 

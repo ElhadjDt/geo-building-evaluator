@@ -28,7 +28,7 @@ function Legend({ mode }) {
       <h3>Evaluation Legend</h3>
       <div className="legend-item">
         <div className="legend-color" style={{ background: '#4caf50' }}></div>
-        <span>Correct Prediction (same type, IoU &gt; 0.5)</span>
+        <span>Correct (matched geometry, same type)</span>
       </div>
       <div className="legend-item">
         <div className="legend-color" style={{ background: '#ff9800' }}></div>
@@ -36,11 +36,11 @@ function Legend({ mode }) {
       </div>
       <div className="legend-item">
         <div className="legend-color" style={{ background: '#f44336' }}></div>
-        <span>Extra Building (no ground truth match)</span>
+        <span>Unmatched Predicted (no geometry match in GT)</span>
       </div>
       <div className="legend-item">
         <div className="legend-color" style={{ background: '#2196f3' }}></div>
-        <span>Missing Building (not detected)</span>
+        <span>Unmatched Ground Truth (no geometry match in predicted)</span>
       </div>
     </div>
   )
