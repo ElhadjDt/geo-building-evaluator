@@ -17,3 +17,5 @@ Open **http://localhost:3002** in your browser.
 ---
 
 → **[Read the full documentation](./docs/ARCHITECTURE.md)**
+
+![](./docs/img/img.png)
