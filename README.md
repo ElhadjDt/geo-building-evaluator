@@ -1,6 +1,6 @@
 # Geo Building Evaluator
 
-A local tool to compare predicted building data against ground truth and evaluate classification accuracy.
+A local tool to compare processed building data against a ground truth and evaluate building type accuracy.
 
 ## Install & Run
 ```bash
