@@ -16,7 +16,7 @@
 ## 1. Project overview
 
 Geo Building Evaluator is a frontend-only React application. It has no backend.
-You upload GeoJSON files in the browser, the app renders them on a Leaflet map, and — in evaluation mode — runs a spatial matching algorithm to compare processed build (i tag **predicted buildings**) against ground truth ones.
+You upload GeoJSON files in the browser, the app renders them on a Leaflet map, and — in evaluation mode — runs a spatial matching algorithm to compare processed buildings (i tagged **predicted buildings**) against ground truth ones.
 
 **Tech stack**
 
