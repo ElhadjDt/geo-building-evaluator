@@ -3,7 +3,7 @@ function MetricsPanel({ matchedBuildings }) {
     correctCount,
     wrongTypeCount,
     unmatchedGroundTruthCount,
-    unmatchedPredictedCount,
+    unmatchedProcessedCount,
     totalCount,
     accuracy
   } = matchedBuildings
@@ -18,7 +18,7 @@ function MetricsPanel({ matchedBuildings }) {
       </div>
 
       <div className="metric-item">
-        <span>Correct Predictions</span>
+        <span>Correct Type Matches</span>
         <span className="metric-value" style={{ color: '#4caf50' }}>{correctCount}</span>
       </div>
 
@@ -33,8 +33,8 @@ function MetricsPanel({ matchedBuildings }) {
       </div>
 
       <div className="metric-item">
-        <span>Unmatched Predicted</span>
-        <span className="metric-value" style={{ color: '#f44336' }}>{unmatchedPredictedCount}</span>
+        <span>Unmatched Processed</span>
+        <span className="metric-value" style={{ color: '#f44336' }}>{unmatchedProcessedCount}</span>
       </div>
 
       <div className="metric-item">

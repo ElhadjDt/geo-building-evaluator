@@ -1,4 +1,4 @@
-function LayerControls({ layers, onToggle, hasRoads, hasWater, hasGroundTruth, hasPredicted }) {
+function LayerControls({ layers, onToggle, hasRoads, hasWater, hasGroundTruth, hasProcessed }) {
   return (
     <div className="layer-toggles">
       <h3>Layers</h3>
@@ -54,17 +54,17 @@ function LayerControls({ layers, onToggle, hasRoads, hasWater, hasGroundTruth, h
         </div>
       )}
 
-      {hasPredicted && (
+      {hasProcessed && (
         <div className="layer-item">
           <label className="layer-label">
             <div className="layer-color" style={{ background: '#f44336' }}></div>
-            Predicted
+            Processed
           </label>
           <label className="toggle-switch">
             <input
               type="checkbox"
-              checked={layers.predicted}
-              onChange={() => onToggle('predicted')}
+              checked={layers.processed}
+              onChange={() => onToggle('processed')}
             />
             <span className="toggle-slider"></span>
           </label>

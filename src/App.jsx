@@ -6,7 +6,8 @@ import LayerControls from './components/LayerControls'
 import Legend from './components/Legend'
 import MetricsPanel from './components/MetricsPanel'
 import FilterPanel from './components/FilterPanel'
-import { calculateBuildingMatches, getBuildingStyle, getEvaluationStyle } from './utils/evaluation'
+import TypeRenamePanel from './components/TypeRenamePanel'
+import { calculateBuildingMatches, getBuildingStyle, getEvaluationStyle, resolveType, applyRename } from './utils/evaluation'
 import './App.css'
 
 /**
@@ -40,51 +41,61 @@ function App() {
   const [roadData, setRoadData] = useState(null)
   const [waterData, setWaterData] = useState(null)
   const [groundTruthBuildings, setGroundTruthBuildings] = useState(null)
-  const [predictedBuildings, setPredictedBuildings] = useState(null)
+  const [processedBuildings, setProcessedBuildings] = useState(null)
 
   // Layer visibility state
   const [layers, setLayers] = useState({
     roads: true,
     water: true,
     groundTruth: true,
-    predicted: true
+    processed: true
   })
 
   // Filter state
   const [selectedTypes, setSelectedTypes] = useState([])
+
+  // Type rename state: { rawType: displayName }
+  const [typeRenames, setTypeRenames] = useState({})
 
   // Popup state
   const [selectedFeature, setSelectedFeature] = useState(null)
 
   // Calculate building matches when in evaluation mode
   const matchedBuildings = useMemo(() => {
-    if (mode !== 'evaluation' || !groundTruthBuildings || !predictedBuildings) {
+    if (mode !== 'evaluation' || !groundTruthBuildings || !processedBuildings) {
       return null
     }
-    return calculateBuildingMatches(groundTruthBuildings, predictedBuildings)
-  }, [mode, groundTruthBuildings, predictedBuildings])
+    return calculateBuildingMatches(groundTruthBuildings, processedBuildings, typeRenames)
+  }, [mode, groundTruthBuildings, processedBuildings, typeRenames])
 
   // Collect all datasets for FitBounds
   const allDatasets = useMemo(
-    () => [roadData, waterData, groundTruthBuildings, predictedBuildings],
-    [roadData, waterData, groundTruthBuildings, predictedBuildings]
+    () => [roadData, waterData, groundTruthBuildings, processedBuildings],
+    [roadData, waterData, groundTruthBuildings, processedBuildings]
   )
 
   // Get all building types for filtering
   const buildingTypes = useMemo(() => {
     const types = new Set()
-    groundTruthBuildings?.features?.forEach(f => { if (f.properties?.landuse) types.add(f.properties.landuse) })
-    predictedBuildings?.features?.forEach(f => { if (f.properties?.landuse) types.add(f.properties.landuse) })
+    groundTruthBuildings?.features?.forEach(f => {
+      const t = applyRename(resolveType(f), typeRenames)
+      if (t) types.add(t)
+    })
+    processedBuildings?.features?.forEach(f => {
+      const t = applyRename(resolveType(f), typeRenames)
+      if (t) types.add(t)
+    })
     return Array.from(types).sort()
-  }, [groundTruthBuildings, predictedBuildings])
+  }, [groundTruthBuildings, processedBuildings, typeRenames])
 
   const filterBuildings = (data) => {
     if (!data || selectedTypes.length === 0) return data
     return {
       ...data,
-      features: data.features.filter(f =>
-        !f.properties?.landuse || selectedTypes.includes(f.properties.landuse)
-      )
+      features: data.features.filter(f => {
+        const t = applyRename(resolveType(f), typeRenames)
+        return !t || selectedTypes.includes(t)
+      })
     }
   }
 
@@ -104,7 +115,7 @@ function App() {
       <div className="sidebar">
         <div className="sidebar-header">
           <h1>Geo Building Evaluator</h1>
-          <p>Compare predicted vs ground truth data</p>
+          <p>Compare processed vs ground truth data</p>
         </div>
 
         <div className="sidebar-content">
@@ -129,11 +140,11 @@ function App() {
             roadData={roadData}
             waterData={waterData}
             groundTruthBuildings={groundTruthBuildings}
-            predictedBuildings={predictedBuildings}
+            processedBuildings={processedBuildings}
             onRoadUpload={setRoadData}
             onWaterUpload={setWaterData}
             onGroundTruthUpload={setGroundTruthBuildings}
-            onPredictedUpload={setPredictedBuildings}
+            onProcessedUpload={setProcessedBuildings}
           />
 
           {/* Layer Controls */}
@@ -143,7 +154,7 @@ function App() {
             hasRoads={!!roadData}
             hasWater={!!waterData}
             hasGroundTruth={!!groundTruthBuildings}
-            hasPredicted={!!predictedBuildings}
+            hasProcessed={!!processedBuildings}
           />
 
           {/* Metrics (Evaluation Mode) */}
@@ -169,12 +180,23 @@ function App() {
               onClear={() => setSelectedTypes([])}
             />
           )}
+
+          {/* Type Rename Panel */}
+          <TypeRenamePanel
+            renames={typeRenames}
+            onAdd={(from, to) => setTypeRenames(prev => ({ ...prev, [from]: to }))}
+            onRemove={(from) => setTypeRenames(prev => {
+              const next = { ...prev }
+              delete next[from]
+              return next
+            })}
+          />
         </div>
       </div>
 
       {/* Map */}
       <div className="map-container">
-        {!roadData && !waterData && !groundTruthBuildings && !predictedBuildings && (
+        {!roadData && !waterData && !groundTruthBuildings && !processedBuildings && (
           <div className="map-empty-hint">Upload GeoJSON files to begin</div>
         )}
         <MapContainer
@@ -232,7 +254,7 @@ function App() {
                   const match = matchedBuildings.groundTruthMatches.get(feature)
                   return getEvaluationStyle(match?.status || 'unmatchedGT')
                 }
-                return getBuildingStyle('groundTruth', feature.properties?.landuse)
+                return getBuildingStyle('groundTruth', resolveType(feature))
               }}
               onEachFeature={(feature, layer) => {
                 layer.on('click', (e) => {
@@ -247,39 +269,41 @@ function App() {
                 layer.bindTooltip(`
                   <div class="custom-tooltip">
                     <h4>Ground Truth</h4>
-                    <p>Type: ${feature.properties?.landuse || 'Unknown'}</p>
+                    ${applyRename(resolveType(feature), typeRenames) ? `<p>Type: ${applyRename(resolveType(feature), typeRenames)}</p>` : ''}
+                    ${feature.properties?.citisketch_class !== undefined && feature.properties?.source_method ? `<p>Source Method: ${feature.properties.source_method}</p>` : ''}
                   </div>
                 `, { sticky: true })
               }}
             />
           )}
 
-          {/* Predicted Buildings */}
-          {layers.predicted && predictedBuildings && (
+          {/* Processed Buildings */}
+          {layers.processed && processedBuildings && (
             <GeoJSON
-              key={mode + '-pred-' + (matchedBuildings ? 'eval' : 'vis')}
-              data={filterBuildings(predictedBuildings)}
+              key={mode + '-proc-' + (matchedBuildings ? 'eval' : 'vis')}
+              data={filterBuildings(processedBuildings)}
               style={(feature) => {
                 if (mode === 'evaluation' && matchedBuildings) {
-                  const match = matchedBuildings.predictedMatches.get(feature)
+                  const match = matchedBuildings.processedMatches.get(feature)
                   return getEvaluationStyle(match?.status || 'unmatchedPred')
                 }
-                return getBuildingStyle('predicted', feature.properties?.landuse)
+                return getBuildingStyle('processed', resolveType(feature))
               }}
               onEachFeature={(feature, layer) => {
                 layer.on('click', (e) => {
                   e.originalEvent.stopPropagation()
                   let matchInfo = null
                   if (mode === 'evaluation' && matchedBuildings) {
-                    const match = matchedBuildings.predictedMatches.get(feature)
+                    const match = matchedBuildings.processedMatches.get(feature)
                     if (match) matchInfo = { status: match.status, distance: match.distance, matchedFeature: match.matchedFeature }
                   }
                   onFeatureClick(feature, e.containerPoint, matchInfo)
                 })
                 layer.bindTooltip(`
                   <div class="custom-tooltip">
-                    <h4>Predicted</h4>
-                    <p>Type: ${feature.properties?.landuse || 'Unknown'}</p>
+                    <h4>Processed</h4>
+                    ${applyRename(resolveType(feature), typeRenames) ? `<p>Type: ${applyRename(resolveType(feature), typeRenames)}</p>` : ''}
+                    ${feature.properties?.citisketch_class !== undefined && feature.properties?.source_method ? `<p>Source Method: ${feature.properties.source_method}</p>` : ''}
                   </div>
                 `, { sticky: true })
               }}
@@ -301,10 +325,19 @@ function App() {
           >
             <div className="popup-content">
               <h4>{selectedFeature.matchInfo ? 'Building Match Details' : 'Building Details'}</h4>
-              <div className="detail-row">
-                <span className="detail-label">Type:</span>
-                <span className="detail-value">{selectedFeature.feature.properties?.landuse || 'Unknown'}</span>
-              </div>
+              {applyRename(resolveType(selectedFeature.feature), typeRenames) && (
+                <div className="detail-row">
+                  <span className="detail-label">Type:</span>
+                  <span className="detail-value">{applyRename(resolveType(selectedFeature.feature), typeRenames)}</span>
+                </div>
+              )}
+              {selectedFeature.feature.properties?.citisketch_class !== undefined &&
+                selectedFeature.feature.properties?.source_method && (
+                <div className="detail-row">
+                  <span className="detail-label">Source Method:</span>
+                  <span className="detail-value">{selectedFeature.feature.properties.source_method}</span>
+                </div>
+              )}
               {selectedFeature.matchInfo && (
                 <>
                   <div className="detail-row">
@@ -318,10 +351,21 @@ function App() {
                     <span className="detail-value">{selectedFeature.matchInfo.distance?.toFixed(1)} m</span>
                   </div>
                   {selectedFeature.matchInfo.matchedFeature && (
-                    <div className="detail-row">
-                      <span className="detail-label">Matched Type:</span>
-                      <span className="detail-value">{selectedFeature.matchInfo.matchedFeature.properties?.landuse || 'Unknown'}</span>
-                    </div>
+                    <>
+                      {applyRename(resolveType(selectedFeature.matchInfo.matchedFeature), typeRenames) && (
+                        <div className="detail-row">
+                          <span className="detail-label">Matched Type:</span>
+                          <span className="detail-value">{applyRename(resolveType(selectedFeature.matchInfo.matchedFeature), typeRenames)}</span>
+                        </div>
+                      )}
+                      {selectedFeature.matchInfo.matchedFeature.properties?.citisketch_class !== undefined &&
+                        selectedFeature.matchInfo.matchedFeature.properties?.source_method && (
+                        <div className="detail-row">
+                          <span className="detail-label">Matched Source Method:</span>
+                          <span className="detail-value">{selectedFeature.matchInfo.matchedFeature.properties.source_method}</span>
+                        </div>
+                      )}
+                    </>
                   )}
                 </>
               )}

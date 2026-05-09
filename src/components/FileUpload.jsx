@@ -4,16 +4,16 @@ function FileUpload({
   roadData,
   waterData,
   groundTruthBuildings,
-  predictedBuildings,
+  processedBuildings,
   onRoadUpload,
   onWaterUpload,
   onGroundTruthUpload,
-  onPredictedUpload
+  onProcessedUpload
 }) {
   const roadInputRef = useRef(null)
   const waterInputRef = useRef(null)
   const groundTruthInputRef = useRef(null)
-  const predictedInputRef = useRef(null)
+  const processedInputRef = useRef(null)
 
   const parseGeoJSON = (file, callback) => {
     const reader = new FileReader()
@@ -83,15 +83,15 @@ function FileUpload({
       </div>
 
       <div className="upload-item">
-        <label>Predicted Buildings</label>
+        <label>Processed Buildings</label>
         <div className="file-input-wrapper">
           <input
-            ref={predictedInputRef}
+            ref={processedInputRef}
             type="file"
             accept=".geojson,.json"
-            onChange={(e) => handleFileChange(e, onPredictedUpload)}
+            onChange={(e) => handleFileChange(e, onProcessedUpload)}
           />
-          {predictedBuildings && <span className="file-status">Loaded</span>}
+          {processedBuildings && <span className="file-status">Loaded</span>}
         </div>
       </div>
     </div>

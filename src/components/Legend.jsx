@@ -9,7 +9,7 @@ function Legend({ mode }) {
         </div>
         <div className="legend-item">
           <div className="legend-color" style={{ background: '#f44336' }}></div>
-          <span>Predicted Building</span>
+          <span>Processed Building</span>
         </div>
         <div className="legend-item">
           <div className="legend-color" style={{ background: '#9e9e9e' }}></div>
@@ -36,11 +36,11 @@ function Legend({ mode }) {
       </div>
       <div className="legend-item">
         <div className="legend-color" style={{ background: '#f44336' }}></div>
-        <span>Unmatched Predicted (no geometry match in GT)</span>
+        <span>Unmatched Processed (no geometry match in GT)</span>
       </div>
       <div className="legend-item">
         <div className="legend-color" style={{ background: '#2196f3' }}></div>
-        <span>Unmatched Ground Truth (no geometry match in predicted)</span>
+        <span>Unmatched Ground Truth (no geometry match in processed)</span>
       </div>
     </div>
   )

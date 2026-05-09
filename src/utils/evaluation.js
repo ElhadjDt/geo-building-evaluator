@@ -146,8 +146,31 @@ function computeAdaptiveThreshold(gtCentroids, gtIndex) {
 }
 
 /**
+ * Resolve the building type from a GeoJSON feature.
+ * Returns citisketch_class if present, otherwise landuse.
+ * @param {Object} feature - GeoJSON feature
+ * @returns {string|undefined}
+ */
+export function resolveType(feature) {
+  const props = feature?.properties
+  if (!props) return undefined
+  return props.citisketch_class !== undefined ? props.citisketch_class : props.landuse
+}
+
+/**
+ * Apply a user-defined rename mapping to a type string.
+ * @param {string|undefined} type - Raw type value
+ * @param {Object} renames - Map of { rawType: displayName }
+ * @returns {string|undefined}
+ */
+export function applyRename(type, renames = {}) {
+  if (type === undefined || type === null) return type
+  return renames[type] !== undefined ? renames[type] : type
+}
+
+/**
  * Get style for building based on source and landuse
- * @param {string} source  - 'groundTruth' or 'predicted'
+ * @param {string} source  - 'groundTruth' or 'processed'
  * @param {string} landuse - Building type
  * @returns {Object} Leaflet style object
  */
@@ -201,10 +224,10 @@ export function getEvaluationStyle(status) {
  * Centroid-based building matching with global greedy assignment.
  *
  * Algorithm:
- *  1. Compute centroids for all GT and predicted buildings          O(n + m)
+ *  1. Compute centroids for all GT and processed buildings          O(n + m)
  *  2. Build R-tree over GT centroids                                O(n log n)
  *  3. Compute adaptive distance threshold from GT nearest-neighbors O(n log n)
- *  4. For every predicted centroid query candidates within threshold O(m log n)
+ *  4. For every processed centroid query candidates within threshold O(m log n)
  *  5. Accumulate ALL (pred, gt, distSq) candidate pairs
  *  6. Sort ALL candidates by distance ascending                     O(k log k)
  *  7. Greedy globally-optimal assignment:
@@ -215,12 +238,13 @@ export function getEvaluationStyle(status) {
  * per-prediction greedy loop and produces a better overall matching.
  *
  * @param {Object} groundTruth - Ground truth GeoJSON FeatureCollection
- * @param {Object} predicted   - Predicted GeoJSON FeatureCollection
+ * @param {Object} processed   - Processed GeoJSON FeatureCollection
+ * @param {Object} renames     - Type rename mapping { rawType: displayName }
  * @returns {Object} Match results and metrics
  */
-export function calculateBuildingMatches(groundTruth, predicted) {
+export function calculateBuildingMatches(groundTruth, processed, renames = {}) {
   const gtFeatures = groundTruth?.features || []
-  const predFeatures = predicted?.features || []
+  const processedFeatures = processed?.features || []
 
   // --- Step 1: Compute centroids ---
 
@@ -233,29 +257,29 @@ export function calculateBuildingMatches(groundTruth, predicted) {
     }
   }
 
-  const predCentroids = []
-  for (const feature of predFeatures) {
+  const processedCentroids = []
+  for (const feature of processedFeatures) {
     const c = getFeatureCentroid(feature)
     if (c) {
       c.feature = feature
-      predCentroids.push(c)
+      processedCentroids.push(c)
     }
   }
 
   // Initialise match records for all valid features
   const groundTruthMatches = new Map()
-  const predictedMatches = new Map()
+  const processedMatches = new Map()
 
   for (const c of gtCentroids) {
     groundTruthMatches.set(c.feature, { status: 'unmatchedGT', distance: Infinity, matchedFeature: null })
   }
-  for (const c of predCentroids) {
-    predictedMatches.set(c.feature, { status: 'unmatchedPred', distance: Infinity, matchedFeature: null })
+  for (const c of processedCentroids) {
+    processedMatches.set(c.feature, { status: 'unmatchedPred', distance: Infinity, matchedFeature: null })
   }
 
   // Edge case: nothing to match
-  if (gtCentroids.length === 0 || predCentroids.length === 0) {
-    return buildResult(groundTruthMatches, predictedMatches, gtCentroids.length, predCentroids.length)
+  if (gtCentroids.length === 0 || processedCentroids.length === 0) {
+    return buildResult(groundTruthMatches, processedMatches, gtCentroids.length, processedCentroids.length)
   }
 
   // --- Step 2: Build R-tree over GT centroids ---
@@ -276,25 +300,25 @@ export function calculateBuildingMatches(groundTruth, predicted) {
 
   // --- Step 4 + 5: Collect ALL candidate pairs ---
 
-  // Each entry: { predCentroid, gtCentroid, distSq }
+  // Each entry: { processedCentroid, gtCentroid, distSq }
   const candidates = []
 
-  for (const predC of predCentroids) {
+  for (const processedC of processedCentroids) {
     const bbox = {
-      minX: predC.x - threshold,
-      minY: predC.y - threshold,
-      maxX: predC.x + threshold,
-      maxY: predC.y + threshold
+      minX: processedC.x - threshold,
+      minY: processedC.y - threshold,
+      maxX: processedC.x + threshold,
+      maxY: processedC.y + threshold
     }
 
     const nearby = gtIndex.search(bbox)
     for (const item of nearby) {
       const gtC = item.centroid
-      const distSq = squaredDistance(predC.x, predC.y, gtC.x, gtC.y)
+      const distSq = squaredDistance(processedC.x, processedC.y, gtC.x, gtC.y)
 
       // Confirm within circular threshold (bbox is a square approximation)
       if (distSq <= thresholdSq) {
-        candidates.push({ predCentroid: predC, gtCentroid: gtC, distSq })
+        candidates.push({ processedCentroid: processedC, gtCentroid: gtC, distSq })
       }
     }
   }
@@ -305,46 +329,46 @@ export function calculateBuildingMatches(groundTruth, predicted) {
   // --- Step 7: Global greedy assignment ---
 
   const matchedGt = new Set()
-  const matchedPred = new Set()
+  const matchedProcessed = new Set()
 
-  for (const { predCentroid, gtCentroid, distSq } of candidates) {
-    const predFeature = predCentroid.feature
+  for (const { processedCentroid, gtCentroid, distSq } of candidates) {
+    const processedFeature = processedCentroid.feature
     const gtFeature = gtCentroid.feature
 
     // Skip if either is already matched
-    if (matchedPred.has(predFeature) || matchedGt.has(gtFeature)) continue
+    if (matchedProcessed.has(processedFeature) || matchedGt.has(gtFeature)) continue
 
-    matchedPred.add(predFeature)
+    matchedProcessed.add(processedFeature)
     matchedGt.add(gtFeature)
 
-    const gtType = gtFeature.properties?.landuse
-    const predType = predFeature.properties?.landuse
-    const status = gtType === predType ? 'correct' : 'wrong-type'
+    const gtType = applyRename(resolveType(gtFeature), renames)
+    const processedType = applyRename(resolveType(processedFeature), renames)
+    const status = gtType === processedType ? 'correct' : 'wrong-type'
 
     // Convert to approximate metres only at record time (single sqrt per match)
     const distMeters = Math.sqrt(distSq) * 111000
 
-    groundTruthMatches.set(gtFeature, { status, distance: distMeters, matchedFeature: predFeature })
-    predictedMatches.set(predFeature, { status, distance: distMeters, matchedFeature: gtFeature })
+    groundTruthMatches.set(gtFeature, { status, distance: distMeters, matchedFeature: processedFeature })
+    processedMatches.set(processedFeature, { status, distance: distMeters, matchedFeature: gtFeature })
   }
 
   // --- Step 8: Metrics ---
-  return buildResult(groundTruthMatches, predictedMatches, gtCentroids.length, predCentroids.length)
+  return buildResult(groundTruthMatches, processedMatches, gtCentroids.length, processedCentroids.length)
 }
 
 /**
  * Aggregate match maps into the result object returned to callers.
  * @param {Map} groundTruthMatches
- * @param {Map} predictedMatches
- * @param {number} gtTotal  - GT features with valid centroids
- * @param {number} predTotal - Pred features with valid centroids
+ * @param {Map} processedMatches
+ * @param {number} gtTotal        - GT features with valid centroids
+ * @param {number} processedTotal - Processed features with valid centroids
  * @returns {Object}
  */
-function buildResult(groundTruthMatches, predictedMatches, gtTotal, predTotal) {
+function buildResult(groundTruthMatches, processedMatches, gtTotal, processedTotal) {
   let correctCount = 0
   let wrongTypeCount = 0
   let unmatchedGroundTruthCount = 0
-  let unmatchedPredictedCount = 0
+  let unmatchedProcessedCount = 0
 
   for (const match of groundTruthMatches.values()) {
     if (match.status === 'correct') correctCount++
@@ -352,8 +376,8 @@ function buildResult(groundTruthMatches, predictedMatches, gtTotal, predTotal) {
     else if (match.status === 'unmatchedGT') unmatchedGroundTruthCount++
   }
 
-  for (const match of predictedMatches.values()) {
-    if (match.status === 'unmatchedPred') unmatchedPredictedCount++
+  for (const match of processedMatches.values()) {
+    if (match.status === 'unmatchedPred') unmatchedProcessedCount++
   }
 
   const totalCount = correctCount + wrongTypeCount
@@ -361,11 +385,11 @@ function buildResult(groundTruthMatches, predictedMatches, gtTotal, predTotal) {
 
   return {
     groundTruthMatches,
-    predictedMatches,
+    processedMatches,
     correctCount,
     wrongTypeCount,
     unmatchedGroundTruthCount,
-    unmatchedPredictedCount,
+    unmatchedProcessedCount,
     totalCount,
     accuracy
   }

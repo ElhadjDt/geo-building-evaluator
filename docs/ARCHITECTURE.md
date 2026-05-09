@@ -16,7 +16,7 @@
 ## 1. Project overview
 
 Geo Building Evaluator is a frontend-only React application. It has no backend.
-You upload GeoJSON files in the browser, the app renders them on a Leaflet map, and — in evaluation mode — runs a spatial matching algorithm to compare processed buildings (i named **predicted buildings**) against ground truth ones.
+You upload GeoJSON files in the browser, the app renders them on a Leaflet map, and — in evaluation mode — runs a spatial matching algorithm to compare processed buildings against ground truth ones.
 
 **Tech stack**
 
@@ -53,7 +53,7 @@ src/
 
 All files must be valid **GeoJSON FeatureCollections**.
 
-### Buildings (ground truth and predicted)
+### Buildings (ground truth and processed)
 
 ```json
 {
@@ -66,12 +66,25 @@ All files must be valid **GeoJSON FeatureCollections**.
         "type": "Polygon",
         "coordinates": [[[lng, lat], [lng, lat], ...]]
       }
+    },
+    {
+      "type": "Feature",
+      "properties": { 
+        "citisketch_class": "Residential",
+        "source_method": "model_v2"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[[lng, lat], [lng, lat], ...]]
+      }
     }
   ]
 }
 ```
 
-The only property the app reads is `landuse`. Supported values: `Home`, `Residential`, `Commercial`, `Industrial`, `Public`, `Education`, `Healthcare`, `Religious` — or any custom string.
+**Building type field:** Each feature must have either a `landuse` or `citisketch_class` property (the app auto-detects which). If both are present, `citisketch_class` takes precedence. Examples: `Home`, `Residential`, `Commercial`, `Industrial`, `Public`, `Education`, `Healthcare`, `Religious` — or any custom string.
+
+**Additional properties:** When using `citisketch_class`, you may optionally include a `source_method` property to document the classification method. This is displayed in tooltips and popups.
 
 Both `Polygon` and `MultiPolygon` geometries are supported.
 
@@ -104,10 +117,10 @@ Only geometry is used. No properties are required.
 roadData            → uploaded road GeoJSON
 waterData           → uploaded water GeoJSON
 groundTruthBuildings
-predictedBuildings
-layers              → { roads, water, groundTruth, predicted } — booleans
+processedBuildings
+layers              → { roads, water, groundTruth, processed } — booleans
 mode                → 'visualization' | 'evaluation'
-selectedTypes       → array of landuse strings for the type filter
+selectedTypes       → array of building type strings for the type filter
 selectedFeature     → feature clicked by the user (for the popup)
 ```
 
@@ -118,7 +131,7 @@ Each dataset is rendered as a `<GeoJSON>` layer directly inside `<MapContainer>`
 | Layer | Color |
 |---|---|
 | Ground truth buildings | Blue |
-| Predicted buildings | Red |
+| Processed buildings | Red |
 | Roads (normal) | Grey |
 | Roads (highway) | Orange |
 | Water | Cyan |
@@ -169,30 +182,30 @@ Using the median avoids sensitivity to outliers (e.g. isolated buildings far fro
 
 **Step 4 — Collect all candidate pairs**
 
-For each predicted centroid, query the R-tree with a bounding box of ± threshold. For every result within the circular threshold (`distSq ≤ thresholdSq`), record a `{ predCentroid, gtCentroid, distSq }` entry. Squared distance is used throughout to avoid unnecessary `Math.sqrt` calls.
+For each processed centroid, query the R-tree with a bounding box of ± threshold. For every result within the circular threshold (`distSq ≤ thresholdSq`), record a `{ processedCentroid, gtCentroid, distSq }` entry. Squared distance is used throughout to avoid unnecessary `Math.sqrt` calls.
 
 **Step 5 — Global greedy assignment**
 
-Sort all candidate pairs by `distSq` ascending. Walk the list: if neither the predicted nor the GT building has been matched yet, assign them. Skip the pair otherwise.
+Sort all candidate pairs by `distSq` ascending. Walk the list: if neither the processed nor the GT building has been matched yet, assign them. Skip the pair otherwise.
 
-This is the key difference from a naïve approach. A per-prediction greedy loop would assign buildings in iteration order, which is arbitrary. Sorting globally and picking the closest pair first produces a better overall matching.
+This is the key difference from a naïve approach. A per-processed greedy loop would assign buildings in iteration order, which is arbitrary. Sorting globally and picking the closest pair first produces a better overall matching.
 
 **Step 6 — Classify and measure**
 
-For each matched pair, compare `feature.properties.landuse`:
+For each matched pair, resolve the type from either `landuse` or `citisketch_class` (whichever is present; `citisketch_class` takes precedence), then compare:
 - Same type → `correct`
 - Different type → `wrong-type`
 
-Unmatched GT features → `unmatchedGT` (geometry has no match in predicted).  
-Unmatched predicted features → `unmatchedPred` (geometry has no match in GT).
+Unmatched GT features → `unmatchedGT` (geometry has no match in processed).  
+Unmatched processed features → `unmatchedPred` (geometry has no match in GT).
 
 **Metrics returned:**
 
 ```
 correctCount               — matched, same type
 wrongTypeCount             — matched, different type
-unmatchedGroundTruthCount  — GT buildings with no geometric match in predicted
-unmatchedPredictedCount    — predicted buildings with no geometric match in GT
+unmatchedGroundTruthCount  — GT buildings with no geometric match in processed
+unmatchedProcessedCount    — processed buildings with no geometric match in GT
 totalCount                 — correctCount + wrongTypeCount (matched buildings only)
 accuracy                   — correctCount / totalCount × 100 (type accuracy for matched buildings only)
 ```
@@ -208,8 +221,8 @@ accuracy                   — correctCount / totalCount × 100 (type accuracy f
 |---|---|---|
 | `correct` | Green `#4caf50` | Matched geometry, same type |
 | `wrong-type` | Orange `#ff9800` | Matched geometry, different type |
-| `unmatchedPred` | Red `#f44336` | Predicted building with no GT geometry match |
-| `unmatchedGT` | Blue `#2196f3` | GT building with no predicted geometry match |
+| `unmatchedPred` | Red `#f44336` | Processed building with no GT geometry match |
+| `unmatchedGT` | Blue `#2196f3` | GT building with no processed geometry match |
 
 ---
 
@@ -219,7 +232,7 @@ accuracy                   — correctCount / totalCount × 100 (type accuracy f
 
 Renders four `<input type="file">` elements. On change, reads the file with `FileReader`, parses JSON, validates that `type === 'FeatureCollection'`, then calls the appropriate `onXxxUpload` callback. Shows a green "Loaded" badge when a dataset is present.
 
-Props: `roadData`, `waterData`, `groundTruthBuildings`, `predictedBuildings`, `onRoadUpload`, `onWaterUpload`, `onGroundTruthUpload`, `onPredictedUpload`.
+Props: `roadData`, `waterData`, `groundTruthBuildings`, `processedBuildings`, `onRoadUpload`, `onWaterUpload`, `onGroundTruthUpload`, `onProcessedUpload`.
 
 ### `LayerControls.jsx`
 
@@ -235,7 +248,7 @@ Reads the six metrics out of the `matchedBuildings` object and renders them as l
 
 ### `FilterPanel.jsx`
 
-Renders one pill button per unique `landuse` value found across both building datasets. Selected types are highlighted. When types are selected, `filterBuildings()` in `App.jsx` filters the GeoJSON before passing it to the `<GeoJSON>` layer. "Show All" clears the selection.
+Renders one pill button per unique building type value found across both building datasets (from either `landuse` or `citisketch_class` fields). Selected types are highlighted. When types are selected, `filterBuildings()` in `App.jsx` filters the GeoJSON before passing it to the `<GeoJSON>` layer. "Show All" clears the selection.
 
 ---
 
