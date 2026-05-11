@@ -42,9 +42,10 @@ src/
 │   ├── LayerControls.jsx  # Toggle switches for each layer
 │   ├── Legend.jsx         # Color legend (changes with mode)
 │   ├── MetricsPanel.jsx   # Evaluation metrics table
-│   └── FilterPanel.jsx    # Filter buildings by landuse type
+│   ├── FilterPanel.jsx    # Filter buildings by type
+│   └── TypeRenamePanel.jsx # Map raw type values to display names
 └── utils/
-    └── evaluation.js      # Matching algorithm and style functions
+    └── evaluation.js      # Matching algorithm, style functions, resolveType, applyRename
 ```
 
 ---
@@ -121,6 +122,7 @@ processedBuildings
 layers              → { roads, water, groundTruth, processed } — booleans
 mode                → 'visualization' | 'evaluation'
 selectedTypes       → array of building type strings for the type filter
+typeRenames         → { rawType: displayName } — user-defined rename mappings
 selectedFeature     → feature clicked by the user (for the popup)
 ```
 
@@ -212,9 +214,17 @@ accuracy                   — correctCount / totalCount × 100 (type accuracy f
 
 **Important:** `accuracy` measures **type classification accuracy only for buildings that matched geometrically**. Unmatched buildings indicate geometry mismatches between data sources, not classification errors.
 
+### Utility functions
+
+`resolveType(feature)` — extracts the building type from a feature. Returns `citisketch_class` if present, otherwise falls back to `landuse`. Returns `undefined` if neither property exists.
+
+`applyRename(type, renames)` — maps a raw type string through the user-defined rename table. Returns the display name if a mapping exists, otherwise returns the original type unchanged.
+
+Both functions are exported from `evaluation.js` and used in `App.jsx` wherever a type value is read.
+
 ### Style functions
 
-`getBuildingStyle(source, landuse)` — returns Leaflet style for visualization mode.  
+`getBuildingStyle(source, type)` — returns Leaflet style for visualization mode. `type` is the resolved value from `resolveType()`.  
 `getEvaluationStyle(status)` — returns Leaflet style based on match status:
 
 | Status | Color | Meaning |
@@ -249,6 +259,12 @@ Reads the six metrics out of the `matchedBuildings` object and renders them as l
 ### `FilterPanel.jsx`
 
 Renders one pill button per unique building type value found across both building datasets (from either `landuse` or `citisketch_class` fields). Selected types are highlighted. When types are selected, `filterBuildings()` in `App.jsx` filters the GeoJSON before passing it to the `<GeoJSON>` layer. "Show All" clears the selection.
+
+### `TypeRenamePanel.jsx`
+
+Lets the user define display-name aliases for raw type values found in the GeoJSON. Each rename maps a raw string (e.g. `"Home"`) to a display name (e.g. `"Residential"`). Renames are applied everywhere a type is shown — tooltips, popups, the filter panel, and evaluation matching — via `applyRename()` in `evaluation.js`. The active rename map lives in `typeRenames` state in `App.jsx` and is passed down as a prop.
+
+Props: `renames` (current `{ rawType: displayName }` map), `onAdd(from, to)`, `onRemove(from)`.
 
 ---
 
