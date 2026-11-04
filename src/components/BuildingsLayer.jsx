@@ -12,11 +12,12 @@ const SOURCE_CONFIG = {
   processed: { label: 'Processed', matchesKey: 'processedMatches', unmatchedStatus: 'unmatchedPred' }
 }
 
-function buildTooltip(feature, source, type) {
+function buildTooltip(feature, source, type, classCount) {
   return `
     <div class="custom-tooltip">
       <h4>${SOURCE_CONFIG[source].label}</h4>
       ${type ? `<p>Type: ${type}</p>` : ''}
+      ${classCount ? `<p>Class Count: ${classCount}</p>` : ''}
       ${feature.properties?.citisketch_class !== undefined && feature.properties?.source_method ? `<p>Source Method: ${feature.properties.source_method}</p>` : ''}
     </div>
   `
@@ -36,10 +37,11 @@ function buildTooltip(feature, source, type) {
  * @param {Array} buildings - { feature, source } entries, in paint order
  * @param {Object|null} matchedBuildings - Evaluation results, null outside evaluation
  * @param {Object} typeRenames - Map of { rawType: displayName }
+ * @param {Map} classCounts - Number of visible buildings per class
  * @param {*} selectedType - Class to keep highlighted when nothing is hovered
  * @param {Function} onFeatureClick - Called with (feature, containerPoint, matchInfo, source)
  */
-function BuildingsLayer({ buildings, matchedBuildings, typeRenames, selectedType, onFeatureClick }) {
+function BuildingsLayer({ buildings, matchedBuildings, typeRenames, classCounts, selectedType, onFeatureClick }) {
   const map = useMap()
   const geoJsonRef = useRef(null)
   const layersByTypeRef = useRef(new Map())
@@ -114,7 +116,7 @@ function BuildingsLayer({ buildings, matchedBuildings, typeRenames, selectedType
             }
           })
 
-          layer.bindTooltip(buildTooltip(feature, source, type), { sticky: true })
+          layer.bindTooltip(buildTooltip(feature, source, type, classCounts.get(type)), { sticky: true })
         }
       }
     ).addTo(map)
@@ -128,7 +130,7 @@ function BuildingsLayer({ buildings, matchedBuildings, typeRenames, selectedType
       clearTimeout(hoverOutTimer)
       geoJson.remove()
     }
-  }, [map, buildings, matchedBuildings, typeRenames, setHighlight])
+  }, [map, buildings, matchedBuildings, typeRenames, classCounts, setHighlight])
 
   useEffect(() => {
     setHighlight(selectedType)

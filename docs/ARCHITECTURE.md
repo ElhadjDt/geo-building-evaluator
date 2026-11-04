@@ -159,6 +159,8 @@ Clicking a building fires `e.containerPoint` (pixel coordinates within the map d
 
 Hovering a building highlights every building of the same class, across both datasets and in both modes, using the renamed type. Clicking a building keeps its class highlighted until another building or the empty map is clicked. Buildings with no type don't trigger a highlight.
 
+The tooltip and click popup show how many buildings are in the class, labelled `Class Count`. `classCounts` in `App.jsx` counts the visible buildings, so the number matches what is highlighted and changes with layer toggles, filters, and renames.
+
 ---
 
 ## 5. Evaluation algorithm
@@ -275,7 +277,7 @@ Renders one pill button per unique building type value found across both buildin
 
 Renders both building datasets as one `L.geoJSON` layer in a dedicated `buildings` pane above roads and water, and handles building tooltips, clicks, and the class highlight. It manages Leaflet directly and renders nothing itself, because react-leaflet's `<GeoJSON>` never updates its `data`, and its `style` prop would overwrite highlights on each render. The layer is rebuilt when the buildings, matches, or renames change. Hover restyles paths without touching React state, so `App` doesn't re-render on mouse movement. Never call `bringToFront` on these layers, since it would break the overlap order.
 
-Props: `buildings`, `matchedBuildings`, `typeRenames`, `selectedType`, `onFeatureClick`.
+Props: `buildings`, `matchedBuildings`, `typeRenames`, `classCounts`, `selectedType`, `onFeatureClick`.
 
 ### `TypeRenamePanel.jsx`
 

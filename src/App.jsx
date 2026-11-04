@@ -115,6 +115,16 @@ function App() {
     ].sort((a, b) => b.area - a.area)
   }, [groundTruthBuildings, processedBuildings, layers.groundTruth, layers.processed, selectedTypes, typeRenames])
 
+  // Number of visible buildings per class, matching what a class highlight shows
+  const classCounts = useMemo(() => {
+    const counts = new Map()
+    visibleBuildings.forEach(({ feature }) => {
+      const t = applyRename(resolveType(feature), typeRenames)
+      if (t !== undefined && t !== null) counts.set(t, (counts.get(t) ?? 0) + 1)
+    })
+    return counts
+  }, [visibleBuildings, typeRenames])
+
   const selectedType = applyRename(resolveType(selectedFeature?.feature), typeRenames)
 
   const toggleLayer = (layer) => {
@@ -267,6 +277,7 @@ function App() {
             buildings={visibleBuildings}
             matchedBuildings={matchedBuildings}
             typeRenames={typeRenames}
+            classCounts={classCounts}
             selectedType={selectedType}
             onFeatureClick={onFeatureClick}
           />
@@ -299,6 +310,12 @@ function App() {
                       <div className="detail-row">
                         <span className="detail-label">{clickedLabel ? `${clickedLabel} Type` : 'Type'}:</span>
                         <span className="detail-value">{applyRename(resolveType(selectedFeature.feature), typeRenames)}</span>
+                      </div>
+                    )}
+                    {classCounts.has(selectedType) && (
+                      <div className="detail-row">
+                        <span className="detail-label">Class Count:</span>
+                        <span className="detail-value">{classCounts.get(selectedType)}</span>
                       </div>
                     )}
                     {selectedFeature.feature.properties?.citisketch_class !== undefined &&
