@@ -45,6 +45,21 @@ function polygonAreaSimple(coords) {
 }
 
 /**
+ * Footprint area of a GeoJSON feature, in squared degrees.
+ * Only meaningful for comparing features, not for display. Holes are ignored.
+ * @param {Object} feature - GeoJSON feature
+ * @returns {number} Outer ring area, summed across parts of a MultiPolygon
+ */
+export function getFeatureArea(feature) {
+  const geom = feature?.geometry
+  if (geom?.type === 'Polygon') return polygonAreaSimple(geom.coordinates?.[0])
+  if (geom?.type === 'MultiPolygon') {
+    return (geom.coordinates || []).reduce((sum, poly) => sum + polygonAreaSimple(poly?.[0]), 0)
+  }
+  return 0
+}
+
+/**
  * Get centroid from a GeoJSON feature (Polygon or MultiPolygon)
  * @param {Object} feature - GeoJSON feature
  * @returns {Object|null} Centroid {x, y} or null
@@ -166,6 +181,17 @@ export function resolveType(feature) {
 export function applyRename(type, renames = {}) {
   if (type === undefined || type === null) return type
   return renames[type] !== undefined ? renames[type] : type
+}
+
+/**
+ * Style overrides for highlighted buildings. The fill color is left alone so
+ * the building's source or evaluation status stays readable.
+ */
+export const HIGHLIGHT_STYLE = {
+  color: '#ffeb3b',
+  weight: 3,
+  opacity: 1,
+  fillOpacity: 0.9
 }
 
 /**

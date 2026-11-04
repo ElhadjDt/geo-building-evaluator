@@ -43,6 +43,7 @@ src/
 │   ├── Legend.jsx         # Color legend (changes with mode)
 │   ├── MetricsPanel.jsx   # Evaluation metrics table
 │   ├── FilterPanel.jsx    # Filter buildings by type
+│   ├── BuildingsLayer.jsx # Building rendering, overlap order, class highlight
 │   └── TypeRenamePanel.jsx # Map raw type values to display names
 └── utils/
     └── evaluation.js      # Matching algorithm, style functions, resolveType, applyRename
@@ -128,7 +129,7 @@ selectedFeature     → feature clicked by the user (for the popup)
 
 ### Visualization mode
 
-Each dataset is rendered as a `<GeoJSON>` layer directly inside `<MapContainer>` (no base tile layer — the canvas is intentionally blank). Colors are fixed:
+Roads and water are rendered as `<GeoJSON>` layers directly inside `<MapContainer>`, and both building datasets are rendered together by `<BuildingsLayer>` (no base tile layer, the canvas is intentionally blank). Colors are fixed:
 
 | Layer | Color |
 |---|---|
@@ -140,7 +141,7 @@ Each dataset is rendered as a `<GeoJSON>` layer directly inside `<MapContainer>`
 
 ### Evaluation mode
 
-When the user switches to "Evaluate", a `useMemo` block calls `calculateBuildingMatches()`. The result is a pair of `Map` objects keyed by GeoJSON feature. Each GeoJSON layer's `style` function looks up the feature in these maps and applies the evaluation color.
+When the user switches to "Evaluate", a `useMemo` block calls `calculateBuildingMatches()`. The result is a pair of `Map` objects keyed by GeoJSON feature. The `style` function in `BuildingsLayer` looks up the feature in these maps and applies the evaluation color.
 
 ### Auto-fit to data
 
@@ -148,7 +149,15 @@ The `<FitBounds>` component (inside `App.jsx`) uses `useMap()` to access the Lea
 
 ### Click popup
 
-Clicking a building fires `e.containerPoint` (pixel coordinates within the map div). The popup is an absolutely-positioned `div` placed at those coordinates, not a Leaflet popup — this avoids re-render issues.
+Clicking a building fires `e.containerPoint` (pixel coordinates within the map div). The popup is an absolutely-positioned `div` placed at those coordinates, not a Leaflet popup, which avoids re-render issues. Clicking the empty map closes it.
+
+### Overlapping buildings
+
+`visibleBuildings` in `App.jsx` merges the visible, filtered buildings from both datasets and sorts them by `getFeatureArea()`, largest first. Paint order follows that order, so a small polygon always sits above a larger one and both can be clicked. Polygons with identical footprints have equal area, so only the top one (processed) is clickable.
+
+### Class highlight
+
+Hovering a building highlights every building of the same class, across both datasets and in both modes, using the renamed type. Clicking a building keeps its class highlighted until another building or the empty map is clicked. Buildings with no type don't trigger a highlight.
 
 ---
 
@@ -234,6 +243,8 @@ Both functions are exported from `evaluation.js` and used in `App.jsx` wherever 
 | `unmatchedPred` | Red `#f44336` | Processed building with no GT geometry match |
 | `unmatchedGT` | Blue `#2196f3` | GT building with no processed geometry match |
 
+`HIGHLIGHT_STYLE`: style overrides for highlighted buildings, a yellow outline with a stronger fill, keeping the fill color so source or match status stays readable.
+
 ---
 
 ## 6. Component reference
@@ -258,7 +269,13 @@ Reads the six metrics out of the `matchedBuildings` object and renders them as l
 
 ### `FilterPanel.jsx`
 
-Renders one pill button per unique building type value found across both building datasets (from either `landuse` or `citisketch_class` fields). Selected types are highlighted. When types are selected, `filterBuildings()` in `App.jsx` filters the GeoJSON before passing it to the `<GeoJSON>` layer. "Show All" clears the selection.
+Renders one pill button per unique building type value found across both building datasets (from either `landuse` or `citisketch_class` fields). Selected types are highlighted. When types are selected, the `visibleBuildings` memo in `App.jsx` filters the features before passing them to `BuildingsLayer`. "Show All" clears the selection.
+
+### `BuildingsLayer.jsx`
+
+Renders both building datasets as one `L.geoJSON` layer in a dedicated `buildings` pane above roads and water, and handles building tooltips, clicks, and the class highlight. It manages Leaflet directly and renders nothing itself, because react-leaflet's `<GeoJSON>` never updates its `data`, and its `style` prop would overwrite highlights on each render. The layer is rebuilt when the buildings, matches, or renames change. Hover restyles paths without touching React state, so `App` doesn't re-render on mouse movement. Never call `bringToFront` on these layers, since it would break the overlap order.
+
+Props: `buildings`, `matchedBuildings`, `typeRenames`, `selectedType`, `onFeatureClick`.
 
 ### `TypeRenamePanel.jsx`
 
