@@ -477,6 +477,20 @@ input:checked + .toggle-slider:before {
   color: var(--text-primary);
 }
 
+.collapsible-header {
+  display: flex;
+  justify-content: space-between;
+  width: 100%;
+  padding: 0;
+  background: none;
+  border: none;
+  font: inherit;
+  color: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+  cursor: pointer;
+}
+
 /* ── Filter Buttons ───────────────────────────────────── */
 .filter-buttons {
   display: flex;

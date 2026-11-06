@@ -86,7 +86,7 @@ All files must be valid **GeoJSON FeatureCollections**.
 
 **Building type field:** Each feature must have either a `landuse` or `citisketch_class` property (the app auto-detects which). If both are present, `citisketch_class` takes precedence. Examples: `Home`, `Residential`, `Commercial`, `Industrial`, `Public`, `Education`, `Healthcare`, `Religious` — or any custom string.
 
-**Additional properties:** When using `citisketch_class`, you may optionally include a `source_method` property to document the classification method. This is displayed in tooltips and popups.
+**Additional properties:** When using `citisketch_class`, you may optionally include a `source_method` property to document the classification method. This is displayed in tooltips and popups, and the collapsible "Source Methods" sidebar panel lists each method with its count of visible buildings.
 
 Both `Polygon` and `MultiPolygon` geometries are supported.
 

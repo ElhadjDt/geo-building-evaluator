@@ -5,6 +5,7 @@ import FileUpload from './components/FileUpload'
 import LayerControls from './components/LayerControls'
 import Legend from './components/Legend'
 import MetricsPanel from './components/MetricsPanel'
+import MethodCountsPanel from './components/MethodCountsPanel'
 import FilterPanel from './components/FilterPanel'
 import TypeRenamePanel from './components/TypeRenamePanel'
 import BuildingsLayer from './components/BuildingsLayer'
@@ -125,6 +126,16 @@ function App() {
     return counts
   }, [visibleBuildings, typeRenames])
 
+  // Number of visible buildings per source method, most used first
+  const methodCounts = useMemo(() => {
+    const counts = new Map()
+    visibleBuildings.forEach(({ feature }) => {
+      const method = feature.properties?.source_method
+      if (method) counts.set(method, (counts.get(method) ?? 0) + 1)
+    })
+    return Array.from(counts).sort((a, b) => b[1] - a[1])
+  }, [visibleBuildings])
+
   const selectedType = applyRename(resolveType(selectedFeature?.feature), typeRenames)
 
   const toggleLayer = (layer) => {
@@ -188,6 +199,11 @@ function App() {
           {/* Metrics (Evaluation Mode) */}
           {mode === 'evaluation' && matchedBuildings && (
             <MetricsPanel matchedBuildings={matchedBuildings} />
+          )}
+
+          {/* Source Method Counts */}
+          {methodCounts.length > 0 && (
+            <MethodCountsPanel counts={methodCounts} />
           )}
 
           {/* Legend */}
