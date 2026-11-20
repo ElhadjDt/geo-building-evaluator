@@ -44,7 +44,10 @@ src/
 │   ├── MetricsPanel.jsx   # Evaluation metrics table
 │   ├── FilterPanel.jsx    # Filter buildings by type
 │   ├── BuildingsLayer.jsx # Building rendering, overlap order, class highlight
+│   ├── RoadsLayer.jsx     # Road rendering, tooltip, road type highlight
 │   └── TypeRenamePanel.jsx # Map raw type values to display names
+├── hooks/
+│   └── useTypeHighlight.js # Shared hover and selection highlight by type
 └── utils/
     └── evaluation.js      # Matching algorithm, style functions, resolveType, applyRename
 ```
@@ -125,11 +128,12 @@ mode                → 'visualization' | 'evaluation'
 selectedTypes       → array of building type strings for the type filter
 typeRenames         → { rawType: displayName } — user-defined rename mappings
 selectedFeature     → feature clicked by the user (for the popup)
+selectedRoadType    → road type kept highlighted after a road click
 ```
 
 ### Visualization mode
 
-Roads and water are rendered as `<GeoJSON>` layers directly inside `<MapContainer>`, and both building datasets are rendered together by `<BuildingsLayer>` (no base tile layer, the canvas is intentionally blank). Colors are fixed:
+Water is rendered as a `<GeoJSON>` layer directly inside `<MapContainer>`, roads by `<RoadsLayer>`, and both building datasets together by `<BuildingsLayer>` (no base tile layer, the canvas is intentionally blank). Colors are fixed:
 
 | Layer | Color |
 |---|---|
@@ -159,6 +163,10 @@ Clicking a building fires `e.containerPoint` (pixel coordinates within the map d
 Hovering a building highlights every building of the same class, across both datasets and in both modes, using the renamed type. Clicking a building keeps its class highlighted until another building or the empty map is clicked. Buildings with no type don't trigger a highlight.
 
 The tooltip and click popup show how many buildings are in the class, labelled `Class Count`. `classCounts` in `App.jsx` counts the visible buildings, so the number matches what is highlighted and changes with layer toggles, filters, and renames.
+
+### Road type highlight
+
+Hovering a road highlights every road of the same type (the `highway` value from `getRoadInfo()`). Clicking a road keeps its type highlighted until another road, a building, or the empty map is clicked. Only one selection exists at a time: clicking a road closes the building popup, and clicking a building clears the road selection. Roads with no type don't trigger a highlight.
 
 ---
 
@@ -244,7 +252,7 @@ Both functions are exported from `evaluation.js` and used in `App.jsx` wherever 
 | `unmatchedPred` | Red `#f44336` | Processed building with no GT geometry match |
 | `unmatchedGT` | Blue `#2196f3` | GT building with no processed geometry match |
 
-`HIGHLIGHT_STYLE`: style overrides for highlighted buildings, a yellow outline with a stronger fill, keeping the fill color so source or match status stays readable.
+`HIGHLIGHT_STYLE`: style overrides for highlighted buildings and roads, a yellow outline with a stronger fill, keeping the fill color so source or match status stays readable.
 
 ---
 
@@ -277,6 +285,16 @@ Renders one pill button per unique building type value found across both buildin
 Renders both building datasets as one `L.geoJSON` layer in a dedicated `buildings` pane above roads and water, and handles building tooltips, clicks, and the class highlight. It manages Leaflet directly and renders nothing itself, because react-leaflet's `<GeoJSON>` never updates its `data`, and its `style` prop would overwrite highlights on each render. The layer is rebuilt when the buildings, matches, or renames change. Hover restyles paths without touching React state, so `App` doesn't re-render on mouse movement. Never call `bringToFront` on these layers, since it would break the overlap order.
 
 Props: `buildings`, `matchedBuildings`, `typeRenames`, `classCounts`, `selectedType`, `onFeatureClick`.
+
+### `RoadsLayer.jsx`
+
+Renders the road network as one `L.geoJSON` layer in the default overlay pane, below the buildings, with a fixed grey style. Binds the name, type, and max speed tooltip and reports road clicks to `App` with the road's type. Like `BuildingsLayer`, it manages Leaflet directly so highlights survive re-renders, and it is rebuilt when a new road file is loaded.
+
+Props: `roads`, `selectedType`, `onRoadClick`.
+
+### `useTypeHighlight.js`
+
+Hook shared by `BuildingsLayer` and `RoadsLayer`. It returns `attach(geoJson, getType)`, which groups an `L.geoJSON` layer's paths by type, binds hover handlers that apply `HIGHLIGHT_STYLE` to every path of the hovered type, and falls back to the hook's `selectedType` when nothing is hovered. A short delay on mouseout avoids flicker when moving between features. Hover restyles paths without touching React state.
 
 ### `TypeRenamePanel.jsx`
 

@@ -1,11 +1,11 @@
-import { useCallback, useEffect, useRef } from 'react'
+import { useEffect, useRef } from 'react'
 import { useMap } from 'react-leaflet'
 import L from 'leaflet'
-import { HIGHLIGHT_STYLE, applyRename, getBuildingStyle, getEvaluationStyle, resolveType } from '../utils/evaluation'
+import useTypeHighlight from '../hooks/useTypeHighlight'
+import { applyRename, getBuildingStyle, getEvaluationStyle, resolveType } from '../utils/evaluation'
 
 const BUILDINGS_PANE = 'buildings'
 const BUILDINGS_PANE_Z_INDEX = 450 // above Leaflet's overlay pane (400), where roads and water live
-const HOVER_OUT_DELAY_MS = 40 // lets a following mouseover cancel the reset when moving between buildings
 
 const SOURCE_CONFIG = {
   groundTruth: { label: 'Ground Truth', matchesKey: 'groundTruthMatches', unmatchedStatus: 'unmatchedGT' },
@@ -43,24 +43,11 @@ function buildTooltip(feature, source, type, classCount) {
  */
 function BuildingsLayer({ buildings, matchedBuildings, typeRenames, classCounts, selectedType, onFeatureClick }) {
   const map = useMap()
-  const geoJsonRef = useRef(null)
-  const layersByTypeRef = useRef(new Map())
-  const highlightedTypeRef = useRef(null)
+  const attachHighlight = useTypeHighlight(selectedType)
 
   // Read from the long-lived Leaflet handlers, which must not capture stale values
-  const selectedTypeRef = useRef(selectedType)
-  selectedTypeRef.current = selectedType
   const onFeatureClickRef = useRef(onFeatureClick)
   onFeatureClickRef.current = onFeatureClick
-
-  const setHighlight = useCallback((type) => {
-    const nextType = type ?? null
-    if (nextType === highlightedTypeRef.current) return
-
-    layersByTypeRef.current.get(highlightedTypeRef.current)?.forEach(layer => geoJsonRef.current.resetStyle(layer))
-    layersByTypeRef.current.get(nextType)?.forEach(layer => layer.setStyle?.(HIGHLIGHT_STYLE))
-    highlightedTypeRef.current = nextType
-  }, [])
 
   useEffect(() => {
     if (!map.getPane(BUILDINGS_PANE)) {
@@ -68,8 +55,7 @@ function BuildingsLayer({ buildings, matchedBuildings, typeRenames, classCounts,
     }
 
     const sourceByFeature = new Map(buildings.map(({ feature, source }) => [feature, source]))
-    const layersByType = new Map()
-    let hoverOutTimer = null
+    const getType = (feature) => applyRename(resolveType(feature), typeRenames)
 
     const getMatch = (feature) => {
       const { matchesKey } = SOURCE_CONFIG[sourceByFeature.get(feature)]
@@ -89,31 +75,16 @@ function BuildingsLayer({ buildings, matchedBuildings, typeRenames, classCounts,
         },
         onEachFeature: (feature, layer) => {
           const source = sourceByFeature.get(feature)
-          const type = applyRename(resolveType(feature), typeRenames)
+          const type = getType(feature)
 
-          if (type !== undefined && type !== null) {
-            if (!layersByType.has(type)) layersByType.set(type, [])
-            layersByType.get(type).push(layer)
-          }
-
-          layer.on({
-            click: (e) => {
-              // Leaflet only honours its own flag, set here, when bubbling to the map
-              L.DomEvent.stopPropagation(e)
-              const match = getMatch(feature)
-              const matchInfo = match
-                ? { status: match.status, distance: match.distance, matchedFeature: match.matchedFeature }
-                : null
-              onFeatureClickRef.current(feature, e.containerPoint, matchInfo, source)
-            },
-            mouseover: () => {
-              clearTimeout(hoverOutTimer)
-              setHighlight(type ?? selectedTypeRef.current)
-            },
-            mouseout: () => {
-              clearTimeout(hoverOutTimer)
-              hoverOutTimer = setTimeout(() => setHighlight(selectedTypeRef.current), HOVER_OUT_DELAY_MS)
-            }
+          layer.on('click', (e) => {
+            // Leaflet only honours its own flag, set here, when bubbling to the map
+            L.DomEvent.stopPropagation(e)
+            const match = getMatch(feature)
+            const matchInfo = match
+              ? { status: match.status, distance: match.distance, matchedFeature: match.matchedFeature }
+              : null
+            onFeatureClickRef.current(feature, e.containerPoint, matchInfo, source)
           })
 
           layer.bindTooltip(buildTooltip(feature, source, type, classCounts.get(type)), { sticky: true })
@@ -121,20 +92,13 @@ function BuildingsLayer({ buildings, matchedBuildings, typeRenames, classCounts,
       }
     ).addTo(map)
 
-    geoJsonRef.current = geoJson
-    layersByTypeRef.current = layersByType
-    highlightedTypeRef.current = null
-    setHighlight(selectedTypeRef.current)
+    const detachHighlight = attachHighlight(geoJson, getType)
 
     return () => {
-      clearTimeout(hoverOutTimer)
+      detachHighlight()
       geoJson.remove()
     }
-  }, [map, buildings, matchedBuildings, typeRenames, classCounts, setHighlight])
-
-  useEffect(() => {
-    setHighlight(selectedType)
-  }, [selectedType, setHighlight])
+  }, [map, buildings, matchedBuildings, typeRenames, classCounts, attachHighlight])
 
   return null
 }

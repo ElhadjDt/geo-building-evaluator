@@ -9,7 +9,8 @@ import MethodCountsPanel from './components/MethodCountsPanel'
 import FilterPanel from './components/FilterPanel'
 import TypeRenamePanel from './components/TypeRenamePanel'
 import BuildingsLayer from './components/BuildingsLayer'
-import { calculateBuildingMatches, getFeatureArea, getRoadInfo, resolveType, applyRename } from './utils/evaluation'
+import RoadsLayer from './components/RoadsLayer'
+import { calculateBuildingMatches, getFeatureArea, resolveType, applyRename } from './utils/evaluation'
 import './App.css'
 
 /**
@@ -38,7 +39,7 @@ function FitBounds({ datasets }) {
 
 /**
  * Calls onClick when the map background is clicked.
- * Building clicks stop propagation, so they don't reach this.
+ * Building and road clicks stop propagation, so they don't reach this.
  */
 function MapClickHandler({ onClick }) {
   useMapEvents({ click: onClick })
@@ -70,6 +71,9 @@ function App() {
 
   // Popup state
   const [selectedFeature, setSelectedFeature] = useState(null)
+
+  // Road type kept highlighted after a road click
+  const [selectedRoadType, setSelectedRoadType] = useState(null)
 
   // Calculate building matches when in evaluation mode
   const matchedBuildings = useMemo(() => {
@@ -142,11 +146,21 @@ function App() {
     setLayers(prev => ({ ...prev, [layer]: !prev[layer] }))
   }
 
+  // A building and a road can't be selected at the same time
   const onFeatureClick = (feature, containerPoint, matchInfo = null, source = null) => {
+    setSelectedRoadType(null)
     setSelectedFeature({ feature, latlng: containerPoint, matchInfo, source })
   }
 
-  const closePopup = () => setSelectedFeature(null)
+  const onRoadClick = (roadType) => {
+    setSelectedFeature(null)
+    setSelectedRoadType(roadType)
+  }
+
+  const clearSelection = () => {
+    setSelectedFeature(null)
+    setSelectedRoadType(null)
+  }
 
   return (
     <div className="app-container">
@@ -250,7 +264,7 @@ function App() {
         >
           {/* Auto-fit to loaded data */}
           <FitBounds datasets={allDatasets} />
-          <MapClickHandler onClick={closePopup} />
+          <MapClickHandler onClick={clearSelection} />
 
           {/* Water Layer */}
           {layers.water && waterData && (
@@ -268,25 +282,10 @@ function App() {
 
           {/* Road Layer */}
           {layers.roads && roadData && (
-            <GeoJSON
-              key={roadData.features.length + '-roads'}
-              data={roadData}
-              style={() => ({
-                color: '#9e9e9e',
-                weight: 2,
-                opacity: 0.8
-              })}
-              onEachFeature={(feature, layer) => {
-                const { name, type, maxspeed } = getRoadInfo(feature)
-                const speedLabel = maxspeed && /^\d+(\.\d+)?$/.test(maxspeed) ? `${maxspeed} km/h` : maxspeed
-                layer.bindTooltip(`
-                  <div class="custom-tooltip">
-                    <h4>${name || 'Unnamed Road'}</h4>
-                    <p>Type: ${type || 'N/A'}</p>
-                    <p>Max Speed: ${speedLabel || 'N/A'}</p>
-                  </div>
-                `, { sticky: true })
-              }}
+            <RoadsLayer
+              roads={roadData}
+              selectedType={selectedRoadType}
+              onRoadClick={onRoadClick}
             />
           )}
 
