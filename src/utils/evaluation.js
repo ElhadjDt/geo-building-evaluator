@@ -173,6 +173,32 @@ export function resolveType(feature) {
 }
 
 /**
+ * Normalize a road property value: OSMnx leaves lists on merged edges, and
+ * empty values are treated as missing.
+ * @param {*} value - Raw property value
+ * @returns {string|undefined}
+ */
+function formatRoadValue(value) {
+  const text = Array.isArray(value) ? value.join(', ') : value
+  return text === undefined || text === null || text === '' ? undefined : String(text)
+}
+
+/**
+ * Read a road's name, type and max speed. OSM keys (name, highway, maxspeed)
+ * win over the legacy roadName, roadType and speed keys.
+ * @param {Object} feature - GeoJSON road feature
+ * @returns {{ name: string|undefined, type: string|undefined, maxspeed: string|undefined }}
+ */
+export function getRoadInfo(feature) {
+  const props = feature?.properties ?? {}
+  return {
+    name: formatRoadValue(props.name ?? props.roadName),
+    type: formatRoadValue(props.highway ?? props.roadType),
+    maxspeed: formatRoadValue(props.maxspeed ?? props.speed)
+  }
+}
+
+/**
  * Apply a user-defined rename mapping to a type string.
  * @param {string|undefined} type - Raw type value
  * @param {Object} renames - Map of { rawType: displayName }

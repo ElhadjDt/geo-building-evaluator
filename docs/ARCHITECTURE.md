@@ -95,15 +95,15 @@ Both `Polygon` and `MultiPolygon` geometries are supported.
 ```json
 {
   "properties": {
-    "roadType": "highway",
-    "roadName": "Main Street",
-    "speed": "60"
+    "highway": "primary",
+    "name": "Main Street",
+    "maxspeed": "60"
   },
   "geometry": { "type": "LineString", ... }
 }
 ```
 
-`roadType`, `roadName`, and `speed` are shown in the tooltip on hover.
+`name`, `highway` (the road type), and `maxspeed` are shown in the tooltip on hover, read by `getRoadInfo()`. These are the OSM keys written by the AutoCalibration road pipeline. The legacy `roadName`, `roadType`, and `speed` keys are still read as fallbacks. List values (from merged OSMnx edges) are joined with commas, and a purely numeric max speed is shown in km/h.
 
 ### Water
 
@@ -135,8 +135,7 @@ Roads and water are rendered as `<GeoJSON>` layers directly inside `<MapContaine
 |---|---|
 | Ground truth buildings | Blue |
 | Processed buildings | Red |
-| Roads (normal) | Grey |
-| Roads (highway) | Orange |
+| Roads | Grey |
 | Water | Cyan |
 
 ### Evaluation mode

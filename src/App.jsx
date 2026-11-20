@@ -9,7 +9,7 @@ import MethodCountsPanel from './components/MethodCountsPanel'
 import FilterPanel from './components/FilterPanel'
 import TypeRenamePanel from './components/TypeRenamePanel'
 import BuildingsLayer from './components/BuildingsLayer'
-import { calculateBuildingMatches, getFeatureArea, resolveType, applyRename } from './utils/evaluation'
+import { calculateBuildingMatches, getFeatureArea, getRoadInfo, resolveType, applyRename } from './utils/evaluation'
 import './App.css'
 
 /**
@@ -271,17 +271,19 @@ function App() {
             <GeoJSON
               key={roadData.features.length + '-roads'}
               data={roadData}
-              style={(feature) => ({
-                color: feature.properties?.roadType === 'highway' ? '#ff9800' : '#9e9e9e',
-                weight: feature.properties?.roadType === 'highway' ? 4 : 2,
+              style={() => ({
+                color: '#9e9e9e',
+                weight: 2,
                 opacity: 0.8
               })}
               onEachFeature={(feature, layer) => {
+                const { name, type, maxspeed } = getRoadInfo(feature)
+                const speedLabel = maxspeed && /^\d+(\.\d+)?$/.test(maxspeed) ? `${maxspeed} km/h` : maxspeed
                 layer.bindTooltip(`
                   <div class="custom-tooltip">
-                    <h4>${feature.properties?.roadName || 'Unknown Road'}</h4>
-                    <p>Type: ${feature.properties?.roadType || 'N/A'}</p>
-                    <p>Speed: ${feature.properties?.speed || 'N/A'}</p>
+                    <h4>${name || 'Unnamed Road'}</h4>
+                    <p>Type: ${type || 'N/A'}</p>
+                    <p>Max Speed: ${speedLabel || 'N/A'}</p>
                   </div>
                 `, { sticky: true })
               }}
