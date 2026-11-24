@@ -1,3 +1,5 @@
+import { ONE_WAY_ROAD_COLOR } from '../utils/evaluation'
+
 function LayerControls({ layers, onToggle, hasRoads, hasWater, hasGroundTruth, hasProcessed }) {
   return (
     <div className="layer-toggles">
@@ -31,6 +33,23 @@ function LayerControls({ layers, onToggle, hasRoads, hasWater, hasGroundTruth, h
               type="checkbox"
               checked={layers.roads}
               onChange={() => onToggle('roads')}
+            />
+            <span className="toggle-slider"></span>
+          </label>
+        </div>
+      )}
+
+      {hasRoads && (
+        <div className="layer-item">
+          <label className="layer-label">
+            <div className="layer-color" style={{ background: ONE_WAY_ROAD_COLOR }}></div>
+            One-way roads
+          </label>
+          <label className="toggle-switch">
+            <input
+              type="checkbox"
+              checked={layers.roadDirections}
+              onChange={() => onToggle('roadDirections')}
             />
             <span className="toggle-slider"></span>
           </label>

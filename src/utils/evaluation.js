@@ -183,18 +183,47 @@ function formatRoadValue(value) {
   return text === undefined || text === null || text === '' ? undefined : String(text)
 }
 
+export const ROAD_DIRECTION = {
+  TWO_WAY: 'two-way',
+  // one way, from the line's first point to its last
+  FORWARD: 'forward',
+  // one way, from the line's last point to its first (OSM's oneway=-1)
+  BACKWARD: 'backward'
+}
+
+// color of one-way roads and their arrows when road directions are shown
+export const ONE_WAY_ROAD_COLOR = '#ff9800'
+
+const ONEWAY_FORWARD_VALUES = new Set(['1', 'true', 'yes'])
+const ONEWAY_BACKWARD_VALUES = new Set(['-1', 'reverse'])
+
 /**
- * Read a road's name, type and max speed. OSM keys (name, highway, maxspeed)
- * win over the legacy roadName, roadType and speed keys.
+ * Read a road's travel direction from its `oneway` value, however it was typed
+ * (1, "1", true, "yes"). The AutoCalibration road pipeline draws every road in
+ * its travel direction, so a one-way road runs from its first point to its last.
+ * @param {Object} props - Road feature properties
+ * @returns {string} One of ROAD_DIRECTION
+ */
+function getRoadDirection(props) {
+  const oneway = String(props.oneway ?? '').trim().toLowerCase()
+  if (ONEWAY_FORWARD_VALUES.has(oneway)) return ROAD_DIRECTION.FORWARD
+  if (ONEWAY_BACKWARD_VALUES.has(oneway)) return ROAD_DIRECTION.BACKWARD
+  return ROAD_DIRECTION.TWO_WAY
+}
+
+/**
+ * Read a road's name, type, max speed and travel direction. OSM keys (name,
+ * highway, maxspeed) win over the legacy roadName, roadType and speed keys.
  * @param {Object} feature - GeoJSON road feature
- * @returns {{ name: string|undefined, type: string|undefined, maxspeed: string|undefined }}
+ * @returns {{ name: string|undefined, type: string|undefined, maxspeed: string|undefined, direction: string }}
  */
 export function getRoadInfo(feature) {
   const props = feature?.properties ?? {}
   return {
     name: formatRoadValue(props.name ?? props.roadName),
     type: formatRoadValue(props.highway ?? props.roadType),
-    maxspeed: formatRoadValue(props.maxspeed ?? props.speed)
+    maxspeed: formatRoadValue(props.maxspeed ?? props.speed),
+    direction: getRoadDirection(props)
   }
 }
 

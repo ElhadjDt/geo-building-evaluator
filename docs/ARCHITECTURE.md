@@ -100,13 +100,16 @@ Both `Polygon` and `MultiPolygon` geometries are supported.
   "properties": {
     "highway": "primary",
     "name": "Main Street",
-    "maxspeed": "60"
+    "maxspeed": "60",
+    "oneway": 1
   },
   "geometry": { "type": "LineString", ... }
 }
 ```
 
 `name`, `highway` (the road type), and `maxspeed` are shown in the tooltip on hover, read by `getRoadInfo()`. These are the OSM keys written by the AutoCalibration road pipeline. The legacy `roadName`, `roadType`, and `speed` keys are still read as fallbacks. List values (from merged OSMnx edges) are joined with commas, and a purely numeric max speed is shown in km/h.
+
+`oneway` gives the road's travel direction, shown in the tooltip and by the "One-way roads" toggle. `1`, `true` or `yes` (in any type or case) mean one-way from the line's first point to its last, which is how the AutoCalibration road pipeline draws every road; `-1` or `reverse` mean one-way the other way; anything else, or no value, means two-way.
 
 ### Water
 
@@ -123,7 +126,7 @@ roadData            → uploaded road GeoJSON
 waterData           → uploaded water GeoJSON
 groundTruthBuildings
 processedBuildings
-layers              → { roads, water, groundTruth, processed } — booleans
+layers              → { roads, roadDirections, water, groundTruth, processed }, booleans
 mode                → 'visualization' | 'evaluation'
 selectedTypes       → array of building type strings for the type filter
 typeRenames         → { rawType: displayName } — user-defined rename mappings
@@ -140,6 +143,7 @@ Water is rendered as a `<GeoJSON>` layer directly inside `<MapContainer>`, roads
 | Ground truth buildings | Blue |
 | Processed buildings | Red |
 | Roads | Grey |
+| One-way roads (when shown) | Orange, with an arrow |
 | Water | Cyan |
 
 ### Evaluation mode
@@ -288,9 +292,11 @@ Props: `buildings`, `matchedBuildings`, `typeRenames`, `classCounts`, `selectedT
 
 ### `RoadsLayer.jsx`
 
-Renders the road network as one `L.geoJSON` layer in the default overlay pane, below the buildings, with a fixed grey style. Binds the name, type, and max speed tooltip and reports road clicks to `App` with the road's type. Like `BuildingsLayer`, it manages Leaflet directly so highlights survive re-renders, and it is rebuilt when a new road file is loaded.
+Renders the road network as one `L.geoJSON` layer in the default overlay pane, below the buildings, in grey. Binds the name, type, max speed and direction tooltip and reports road clicks to `App` with the road's type. Like `BuildingsLayer`, it manages Leaflet directly so highlights survive re-renders, and it is rebuilt when a new road file is loaded or road directions are toggled.
 
-Props: `roads`, `selectedType`, `onRoadClick`.
+With `showDirections`, one-way roads are drawn in orange (`ONE_WAY_ROAD_COLOR`) and get an arrow halfway along them, pointing in their travel direction. The arrows are non-interactive markers in their own layer group, so hovering and clicking still reach the road. They make it easy to check that each ingress/egress point has a road in each direction.
+
+Props: `roads`, `selectedType`, `showDirections`, `onRoadClick`.
 
 ### `useTypeHighlight.js`
 

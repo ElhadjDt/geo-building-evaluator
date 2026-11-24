@@ -58,6 +58,7 @@ function App() {
   // Layer visibility state
   const [layers, setLayers] = useState({
     roads: true,
+    roadDirections: false,
     water: true,
     groundTruth: true,
     processed: true
@@ -285,6 +286,7 @@ function App() {
             <RoadsLayer
               roads={roadData}
               selectedType={selectedRoadType}
+              showDirections={layers.roadDirections}
               onRoadClick={onRoadClick}
             />
           )}
