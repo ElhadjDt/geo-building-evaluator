@@ -3,6 +3,7 @@ import { useMap } from 'react-leaflet'
 import L from 'leaflet'
 import useTypeHighlight from '../hooks/useTypeHighlight'
 import { applyRename, getBuildingStyle, getEvaluationStyle, resolveType } from '../utils/evaluation'
+import { formatCount, getIepInfo, iepLabel, isIngressEgress } from '../utils/ingressEgress'
 
 const BUILDINGS_PANE = 'buildings'
 const BUILDINGS_PANE_Z_INDEX = 450 // above Leaflet's overlay pane (400), where roads and water live
@@ -12,7 +13,23 @@ const SOURCE_CONFIG = {
   processed: { label: 'Processed', matchesKey: 'processedMatches', unmatchedStatus: 'unmatchedPred' }
 }
 
+// Leaflet's default pin, recoloured by the `iep-marker` class in index.css
+const IEP_ICON = new L.Icon.Default({ className: 'iep-marker' })
+
+function buildIepTooltip(feature, source) {
+  const info = getIepInfo(feature)
+  return `
+    <div class="custom-tooltip">
+      <h4>${SOURCE_CONFIG[source].label} · Ingress / Egress</h4>
+      <p>Road: ${iepLabel(info)}${info.name && info.highway ? ` (${info.highway})` : ''}</p>
+      <p>Outgoing: ${formatCount(info.outgoing)}</p>
+      <p>Incoming: ${formatCount(info.incoming)}</p>
+    </div>
+  `
+}
+
 function buildTooltip(feature, source, type, classCount) {
+  if (isIngressEgress(feature)) return buildIepTooltip(feature, source)
   return `
     <div class="custom-tooltip">
       <h4>${SOURCE_CONFIG[source].label}</h4>
@@ -66,6 +83,7 @@ function BuildingsLayer({ buildings, matchedBuildings, typeRenames, classCounts,
       { type: 'FeatureCollection', features: buildings.map(({ feature }) => feature) },
       {
         pane: BUILDINGS_PANE,
+        pointToLayer: (feature, latlng) => isIngressEgress(feature) ? L.marker(latlng, { icon: IEP_ICON }) : L.marker(latlng),
         style: (feature) => {
           const source = sourceByFeature.get(feature)
           if (matchedBuildings) {

@@ -6,11 +6,14 @@ import LayerControls from './components/LayerControls'
 import Legend from './components/Legend'
 import MetricsPanel from './components/MetricsPanel'
 import MethodCountsPanel from './components/MethodCountsPanel'
+import IngressEgressPanel from './components/IngressEgressPanel'
+import IepDetails from './components/IepDetails'
 import FilterPanel from './components/FilterPanel'
 import TypeRenamePanel from './components/TypeRenamePanel'
 import BuildingsLayer from './components/BuildingsLayer'
 import RoadsLayer from './components/RoadsLayer'
 import { calculateBuildingMatches, getFeatureArea, resolveType, applyRename } from './utils/evaluation'
+import { isIngressEgress } from './utils/ingressEgress'
 import './App.css'
 
 /**
@@ -141,7 +144,14 @@ function App() {
     return Array.from(counts).sort((a, b) => b[1] - a[1])
   }, [visibleBuildings])
 
+  // The visible ingress/egress points, for their sidebar totals
+  const visibleIeps = useMemo(
+    () => visibleBuildings.map(({ feature }) => feature).filter(isIngressEgress),
+    [visibleBuildings]
+  )
+
   const selectedType = applyRename(resolveType(selectedFeature?.feature), typeRenames)
+  const selectedIsIep = isIngressEgress(selectedFeature?.feature)
 
   const toggleLayer = (layer) => {
     setLayers(prev => ({ ...prev, [layer]: !prev[layer] }))
@@ -219,6 +229,11 @@ function App() {
           {/* Source Method Counts */}
           {methodCounts.length > 0 && (
             <MethodCountsPanel counts={methodCounts} />
+          )}
+
+          {/* Ingress / Egress totals */}
+          {visibleIeps.length > 0 && (
+            <IngressEgressPanel ieps={visibleIeps} />
           )}
 
           {/* Legend */}
@@ -315,7 +330,11 @@ function App() {
             }}
           >
             <div className="popup-content">
-              <h4>{selectedFeature.matchInfo ? 'Building Match Details' : 'Building Details'}</h4>
+              <h4>
+                {selectedIsIep
+                  ? 'Ingress / Egress Point'
+                  : selectedFeature.matchInfo ? 'Building Match Details' : 'Building Details'}
+              </h4>
               {(() => {
                 const clickedLabel = selectedFeature.matchInfo && selectedFeature.source
                   ? (selectedFeature.source === 'groundTruth' ? 'Ground Truth' : 'Processed')
@@ -344,6 +363,7 @@ function App() {
                         <span className="detail-value">{selectedFeature.feature.properties.source_method}</span>
                       </div>
                     )}
+                    {selectedIsIep && <IepDetails feature={selectedFeature.feature} />}
                     {selectedFeature.matchInfo && (
                       <>
                         <div className="detail-row">

@@ -45,11 +45,14 @@ src/
 │   ├── FilterPanel.jsx    # Filter buildings by type
 │   ├── BuildingsLayer.jsx # Building rendering, overlap order, class highlight
 │   ├── RoadsLayer.jsx     # Road rendering, tooltip, road type highlight
+│   ├── IngressEgressPanel.jsx # Ingress/egress totals and per-point list
+│   ├── IepDetails.jsx     # Click-popup rows for an ingress/egress point
 │   └── TypeRenamePanel.jsx # Map raw type values to display names
 ├── hooks/
 │   └── useTypeHighlight.js # Shared hover and selection highlight by type
 └── utils/
-    └── evaluation.js      # Matching algorithm, style functions, resolveType, applyRename
+    ├── evaluation.js      # Matching algorithm, style functions, resolveType, applyRename
+    └── ingressEgress.js   # Reads an ingress/egress point's values
 ```
 
 ---
@@ -92,6 +95,17 @@ All files must be valid **GeoJSON FeatureCollections**.
 **Additional properties:** When using `citisketch_class`, you may optionally include a `source_method` property to document the classification method. This is displayed in tooltips and popups, and the collapsible "Source Methods" sidebar panel lists each method with its count of visible buildings.
 
 Both `Polygon` and `MultiPolygon` geometries are supported.
+
+**Ingress/egress points:** the AutoCalibration job step adds the community's road exits to the processed buildings as `Point` features with `citisketch_class: IngressEgress`. They keep Leaflet's default pin, turned purple by the `iep-marker` class. Their tooltip, click popup and the "Ingress / Egress" sidebar panel show whatever of these values the file has (read by `getIepInfo()` in `utils/ingressEgress.js`):
+
+| Property | Shown as |
+| --- | --- |
+| `highway`, `name` | the road the point sits on |
+| `lanes`, `speed`, `capacity` | the road's capacity (lanes times speed), which weights how commuters are split between the points |
+| `job_total`, `jobSeeds` | the outgoing commuters, in total and by occupation (`[{ type, count }]`) |
+| `activityHooks.PRIMARY_WORK` | the incoming workers, shown as "not in data" for files written before it existed |
+
+`jobSeeds` and `activityHooks` are read whether they are stored as objects or as JSON strings. The panel totals cover the visible points, so they follow the layer toggles and type filters; in a DA-trimmed file the incoming workers are already scaled to the selected DAs.
 
 ### Roads
 
@@ -289,6 +303,18 @@ Renders one pill button per unique building type value found across both buildin
 Renders both building datasets as one `L.geoJSON` layer in a dedicated `buildings` pane above roads and water, and handles building tooltips, clicks, and the class highlight. It manages Leaflet directly and renders nothing itself, because react-leaflet's `<GeoJSON>` never updates its `data`, and its `style` prop would overwrite highlights on each render. The layer is rebuilt when the buildings, matches, or renames change. Hover restyles paths without touching React state, so `App` doesn't re-render on mouse movement. Never call `bringToFront` on these layers, since it would break the overlap order.
 
 Props: `buildings`, `matchedBuildings`, `typeRenames`, `classCounts`, `selectedType`, `onFeatureClick`.
+
+### `IngressEgressPanel.jsx`
+
+Shown when the visible buildings include ingress/egress points. Lists their total outgoing commuters and incoming workers, and, when expanded, each point's road with its outgoing and incoming, largest road capacity first.
+
+Props: `ieps` (the visible `IngressEgress` features).
+
+### `IepDetails.jsx`
+
+The click-popup rows for an ingress/egress point: road, road type, lanes, speed, capacity, outgoing, incoming, and the outgoing split by occupation.
+
+Props: `feature`.
 
 ### `RoadsLayer.jsx`
 
